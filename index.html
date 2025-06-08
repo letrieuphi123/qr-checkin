@@ -5,80 +5,80 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>QR Check-in App</title>
   <style>
-    body {
-      font-family: sans-serif;
-      padding: 20px;
-      background: #fff;
-    }
-    h1 {
-      font-size: 20px;
-      margin-bottom: 10px;
-    }
-    #guest-list li {
-      margin: 5px 0;
-    }
-    #guest-list li.checked-in {
-      font-weight: bold;
-      color: green;
-    }
-    #scan-btn {
-      margin-top: 20px;
-      padding: 10px;
-    }
-    #reader {
-      margin-top: 20px;
-    }
+    body { font-family: sans-serif; padding: 20px; }
+    h1 { font-size: 1.5rem; margin-bottom: 1rem; }
+    #guest-list li { margin: 0.25rem 0; }
+    #guest-list li.checked-in { color: green; font-weight: bold; }
+    #scan-btn { margin-top: 1rem; padding: 0.5rem 1rem; font-size: 1rem; }
+    #reader { margin-top: 1rem; width: 100%; max-width: 360px; }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+  <!-- Thư viện html5-qrcode -->
   <script src="https://unpkg.com/html5-qrcode@2.3.7/minified/html5-qrcode.min.js"></script>
 </head>
 <body>
   <h1>Danh sách khách mời</h1>
   <ul id="guest-list"></ul>
   <button id="scan-btn">Quét QR để Check-in</button>
-  <div id="reader" style="display:none; width: 300px; height: 300px;"></div>
+  <div id="reader" style="display:none;"></div>
 
   <script>
-    // Giả lập dữ liệu QR từ các ảnh trong thư mục assets (tên file tương ứng là mã)
-    const guestData = [
-      "TMK003", "NHM007", "ABC123" // các mã QR sẽ chứa chuỗi này
-    ];
-
-    const guestListEl = document.getElementById("guest-list");
-
-    // Tạo danh sách ban đầu
+    // Danh sách mã khách mời (giả lập)
+    const guestCodes = ["TMK003", "NHM007", "ABC123"];
     const guestMap = {};
-    guestData.forEach(code => {
-      const li = document.createElement("li");
-      li.innerText = code;
-      li.id = `guest-${code}`;
-      guestListEl.appendChild(li);
+
+    // Hiển thị danh sách
+    const listEl = document.getElementById('guest-list');
+    guestCodes.forEach(code => {
+      const li = document.createElement('li');
+      li.textContent = code;
+      li.id = 'guest-' + code;
+      listEl.appendChild(li);
       guestMap[code] = li;
     });
 
-    // Nút scan
-    document.getElementById("scan-btn").addEventListener("click", () => {
-      const reader = document.getElementById("reader");
-      reader.style.display = "block";
+    const scanBtn = document.getElementById('scan-btn');
+    const readerEl = document.getElementById('reader');
+    let scanner = null;
 
-      const html5QrCode = new Html5Qrcode("reader");
-      html5QrCode.start(
+    scanBtn.addEventListener('click', () => {
+      scanBtn.disabled = true;
+      readerEl.style.display = 'block';
+      // Khởi tạo Html5QrcodeScanner
+      scanner = new Html5Qrcode("reader");
+      scanner.start(
         { facingMode: "environment" },
         { fps: 10, qrbox: 250 },
         qrCodeMessage => {
+          // Khi quét thành công
           if (guestMap[qrCodeMessage]) {
-            alert("✅ Đã check-in: " + qrCodeMessage);
-            guestMap[qrCodeMessage].classList.add("checked-in");
+            alert('✅ Đã check-in: ' + qrCodeMessage);
+            guestMap[qrCodeMessage].classList.add('checked-in');
           } else {
-            alert("❌ Mã không hợp lệ: " + qrCodeMessage);
+            alert('❌ Mã không hợp lệ: ' + qrCodeMessage);
           }
-          html5QrCode.stop().then(() => reader.style.display = "none");
+          stopScanner();
         },
-        error => {
-          // Không cần xử lý lỗi nhỏ khi chưa quét được
+        errorMessage => {
+          // console.log('Quét lỗi: ', errorMessage);
         }
-      );
+      ).catch(err => {
+        console.error('Không thể khởi động camera:', err);
+        alert('Không thể mở camera. Vui lòng kiểm tra quyền truy cập.');
+        scanBtn.disabled = false;
+      });
     });
+
+    function stopScanner() {
+      if (scanner) {
+        scanner.stop().then(() => {
+          scanner.clear();
+          readerEl.style.display = 'none';
+          scanBtn.disabled = false;
+        }).catch(err => {
+          console.error('Lỗi khi dừng scanner:', err);
+        });
+      }
+    }
   </script>
 </body>
 </html>
