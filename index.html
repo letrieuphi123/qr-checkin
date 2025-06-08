@@ -3,80 +3,207 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>QR hư Check-in App</title>
+  <title>Ứng dụng Check-in QR</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Font: Inter -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    body { font-family: sans-serif; padding: 20px; }
-    h1 { font-size: 1.5rem; margin-bottom: 1rem; }
-    #guest-list li { margin: 0.25rem 0; }
-    #guest-list li.checked-in { color: green; font-weight: bold; }
-    #scan-btn { margin-top: 1rem; padding: 0.5rem 1rem; font-size: 1rem; }
-    #reader { margin-top: 1rem; width: 100%; max-width: 360px; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f0f2f5;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 1.25rem; /* 20px */
+    }
+    .container {
+      max-width: 28rem; /* 448px */
+      width: 100%;
+      background-color: #ffffff;
+      padding: 1.5rem; /* 24px */
+      border-radius: 0.75rem; /* 12px */
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+    #reader {
+      width: 100%;
+      max-width: 22.5rem; /* 360px */
+      height: auto; /* Allow height to adjust based on content */
+      margin-top: 1rem; /* 16px */
+      border-radius: 0.5rem; /* 8px */
+      overflow: hidden; /* Ensure video feed stays within rounded corners */
+    }
+    /* Styles for html5-qrcode's video element */
+    #reader > div > video {
+      border-radius: 0.5rem !important;
+    }
+
+    /* Modal styling */
+    .modal {
+        display: none; /* Hidden by default */
+        position: fixed; /* Stay in place */
+        z-index: 1000; /* Sit on top */
+        left: 0;
+        top: 0;
+        width: 100%; /* Full width */
+        height: 100%; /* Full height */
+        overflow: auto; /* Enable scroll if needed */
+        background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .modal-content {
+        background-color: #fefefe;
+        margin: auto;
+        padding: 1.5rem; /* 24px */
+        border: 1px solid #888;
+        width: 90%;
+        max-width: 20rem; /* 320px */
+        border-radius: 0.75rem; /* 12px */
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        text-align: center;
+    }
+
+    .close-button {
+        color: #aaa;
+        float: right;
+        font-size: 1.75rem; /* 28px */
+        font-weight: bold;
+    }
+
+    .close-button:hover,
+    .close-button:focus {
+        color: black;
+        text-decoration: none;
+        cursor: pointer;
+    }
   </style>
   <!-- Thư viện html5-qrcode -->
   <script src="https://unpkg.com/html5-qrcode@2.3.7/minified/html5-qrcode.min.js"></script>
 </head>
-<body>
-  <h1>Danh sách khách mời</h1>
-  <ul id="guest-list"></ul>
-  <button id="scan-btn">Quét QR để Check-in</button>
-  <div id="reader" style="display:none;"></div>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center p-5">
+  <div class="container flex flex-col items-center">
+    <h1 class="text-2xl font-semibold text-gray-800 mb-4">Danh sách khách mời</h1>
+    <ul id="guest-list" class="w-full list-disc list-inside text-gray-700 mb-6"></ul>
+    <button id="scan-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg shadow-md transition duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75">
+      Quét QR để Check-in
+    </button>
+    <div id="reader" style="display:none;" class="mt-4"></div>
+  </div>
+
+  <!-- Custom Modal for Messages -->
+  <div id="custom-modal" class="modal fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center hidden">
+    <div class="modal-content bg-white p-6 rounded-xl shadow-lg w-11/12 max-w-sm text-center">
+      <span class="close-button text-gray-500 hover:text-gray-800 text-3xl font-bold cursor-pointer absolute top-2 right-4">&times;</span>
+      <p id="modal-message" class="text-lg text-gray-800"></p>
+      <button id="modal-ok-btn" class="mt-6 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg transition duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75">
+        Đóng
+      </button>
+    </div>
+  </div>
 
   <script>
     // Danh sách mã khách mời (giả lập)
     const guestCodes = ["TMK003", "NHM007", "ABC123"];
     const guestMap = {};
 
-    // Hiển thị danh sách
+    // Element references
     const listEl = document.getElementById('guest-list');
+    const scanBtn = document.getElementById('scan-btn');
+    const readerEl = document.getElementById('reader');
+    const customModal = document.getElementById('custom-modal');
+    const modalMessage = document.getElementById('modal-message');
+    const modalOkBtn = document.getElementById('modal-ok-btn');
+    const closeButton = document.querySelector('.close-button');
+
+    let scanner = null; // Biến toàn cục để giữ đối tượng scanner
+
+    // Function to show custom modal
+    function showModal(message) {
+      modalMessage.textContent = message;
+      customModal.classList.remove('hidden');
+    }
+
+    // Function to hide custom modal
+    function hideModal() {
+      customModal.classList.add('hidden');
+    }
+
+    // Event listeners for modal buttons
+    modalOkBtn.addEventListener('click', hideModal);
+    closeButton.addEventListener('click', hideModal);
+    // Hide modal if clicked outside content
+    customModal.addEventListener('click', (e) => {
+      if (e.target === customModal) {
+        hideModal();
+      }
+    });
+
+    // Hiển thị danh sách khách mời
     guestCodes.forEach(code => {
       const li = document.createElement('li');
       li.textContent = code;
       li.id = 'guest-' + code;
+      li.classList.add('py-1', 'text-base');
       listEl.appendChild(li);
       guestMap[code] = li;
     });
 
-    const scanBtn = document.getElementById('scan-btn');
-    const readerEl = document.getElementById('reader');
-    let scanner = null;
-
     scanBtn.addEventListener('click', () => {
-      scanBtn.disabled = true;
-      readerEl.style.display = 'block';
-      // Khởi tạo Html5QrcodeScanner
-      scanner = new Html5Qrcode("reader");
+      scanBtn.disabled = true; // Vô hiệu hóa nút quét
+      readerEl.style.display = 'block'; // Hiển thị khung đọc QR
+
+      // Đảm bảo chỉ khởi tạo một instance của Html5Qrcode
+      if (!scanner) {
+        scanner = new Html5Qrcode("reader");
+      }
+
+      // Khởi động trình quét QR
       scanner.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: 250 },
-        qrCodeMessage => {
-          // Khi quét thành công
+        { facingMode: "environment" }, // Ưu tiên camera sau
+        { fps: 10, qrbox: 250 }, // Tốc độ quét và kích thước hộp quét
+        (qrCodeMessage) => { // Callback khi quét thành công
+          console.log(`Mã QR được quét: ${qrCodeMessage}`);
           if (guestMap[qrCodeMessage]) {
-            alert('✅ Đã check-in: ' + qrCodeMessage);
-            guestMap[qrCodeMessage].classList.add('checked-in');
+            showModal('✅ Đã check-in: ' + qrCodeMessage);
+            guestMap[qrCodeMessage].classList.add('checked-in', 'text-green-600', 'font-bold');
           } else {
-            alert('❌ Mã không hợp lệ: ' + qrCodeMessage);
+            showModal('❌ Mã không hợp lệ: ' + qrCodeMessage);
           }
-          stopScanner();
+          stopScanner(); // Dừng quét sau khi xử lý
         },
-        errorMessage => {
-          // console.log('Quét lỗi: ', errorMessage);
+        (errorMessage) => { // Callback khi quét lỗi (ví dụ: không tìm thấy mã)
+          // console.log('Quét lỗi: ', errorMessage); // Giữ console log cho debug
+          // Tránh hiển thị quá nhiều thông báo lỗi nhỏ
         }
       ).catch(err => {
         console.error('Không thể khởi động camera:', err);
-        alert('Không thể mở camera. Vui lòng kiểm tra quyền truy cập.');
-        scanBtn.disabled = false;
+        showModal('Không thể mở camera. Vui lòng kiểm tra quyền truy cập và đảm bảo bạn đang sử dụng HTTPS.');
+        scanBtn.disabled = false; // Kích hoạt lại nút quét
+        readerEl.style.display = 'none'; // Ẩn khung đọc
       });
     });
 
     function stopScanner() {
-      if (scanner) {
+      if (scanner && scanner.is	Scanning) { // Kiểm tra xem scanner có đang quét không
         scanner.stop().then(() => {
-          scanner.clear();
-          readerEl.style.display = 'none';
-          scanBtn.disabled = false;
+          scanner.clear(); // Xóa khung hình quét
+          readerEl.style.display = 'none'; // Ẩn khung đọc QR
+          scanBtn.disabled = false; // Kích hoạt lại nút quét
+          console.log('Scanner đã dừng thành công.');
         }).catch(err => {
           console.error('Lỗi khi dừng scanner:', err);
+          showModal('Đã xảy ra lỗi khi dừng camera.');
+          scanBtn.disabled = false; // Kích hoạt lại nút quét
+          readerEl.style.display = 'none'; // Ẩn khung đọc QR
         });
+      } else {
+        console.log('Scanner không hoạt động.');
+        scanBtn.disabled = false; // Kích hoạt lại nút quét nếu scanner không chạy
+        readerEl.style.display = 'none'; // Ẩn khung đọc QR
       }
     }
   </script>
