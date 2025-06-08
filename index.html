@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QR Check-in App</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      background: #fff;
+    }
+    h1 {
+      font-size: 20px;
+      margin-bottom: 10px;
+    }
+    #guest-list li {
+      margin: 5px 0;
+    }
+    #guest-list li.checked-in {
+      font-weight: bold;
+      color: green;
+    }
+    #scan-btn {
+      margin-top: 20px;
+      padding: 10px;
+    }
+    #reader {
+      margin-top: 20px;
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.7/minified/html5-qrcode.min.js"></script>
+</head>
+<body>
+  <h1>Danh sách khách mời</h1>
+  <ul id="guest-list"></ul>
+  <button id="scan-btn">Quét QR để Check-in</button>
+  <div id="reader" style="display:none; width: 300px; height: 300px;"></div>
+
+  <script>
+    // Giả lập dữ liệu QR từ các ảnh trong thư mục assets (tên file tương ứng là mã)
+    const guestData = [
+      "TMK003", "NHM007", "ABC123" // các mã QR sẽ chứa chuỗi này
+    ];
+
+    const guestListEl = document.getElementById("guest-list");
+
+    // Tạo danh sách ban đầu
+    const guestMap = {};
+    guestData.forEach(code => {
+      const li = document.createElement("li");
+      li.innerText = code;
+      li.id = `guest-${code}`;
+      guestListEl.appendChild(li);
+      guestMap[code] = li;
+    });
+
+    // Nút scan
+    document.getElementById("scan-btn").addEventListener("click", () => {
+      const reader = document.getElementById("reader");
+      reader.style.display = "block";
+
+      const html5QrCode = new Html5Qrcode("reader");
+      html5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 250 },
+        qrCodeMessage => {
+          if (guestMap[qrCodeMessage]) {
+            alert("✅ Đã check-in: " + qrCodeMessage);
+            guestMap[qrCodeMessage].classList.add("checked-in");
+          } else {
+            alert("❌ Mã không hợp lệ: " + qrCodeMessage);
+          }
+          html5QrCode.stop().then(() => reader.style.display = "none");
+        },
+        error => {
+          // Không cần xử lý lỗi nhỏ khi chưa quét được
+        }
+      );
+    });
+  </script>
+</body>
+</html>
